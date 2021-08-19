@@ -3,11 +3,13 @@
     <section>
         {{#if user}}
         <a href="/course/create" class="btn btn-warning ">Create Course</a>
-        <form class="search float-right">
+        {{#with ctx}}
+        <form action="/" method="GET" class="search float-right">
             <label>Search: </label>
-            <input type="text">
-            <input type="submit" class="btn btn-primary" value="Search">
+            <input type="text" name="search" value="{{search}}">
+            <input type="submit" class="btn btn-primary" value="search">
         </form>
+        {{/with}}
         {{/if}}
     </section>
     {{#if courses}}

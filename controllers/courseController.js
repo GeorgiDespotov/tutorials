@@ -37,7 +37,7 @@ router.post('/create', isUser(),
                 course: {
                     title: req.body.title,
                     description: req.body.description,
-                    iamgeUrl: req.body.iamgeUrl,
+                    imageUrl: req.body.imageUrl,
                     duration: req.body.duration
                 }
             }
@@ -45,34 +45,106 @@ router.post('/create', isUser(),
         }
     });
 
-    router.get('/details/:id', async (req, res) => {
+router.get('/details/:id', async (req, res) => {
+    try {
+        const course = await req.storage.getOneCourse(req.params.id);
+
+        if (req.user) {
+            course.isAuthor = req.user._id == course.author;
+            course.hasJoined = course.users.find(u => u._id == req.user._id);
+            course.haveLogedUser = req.user._id;
+        }
+
+        res.render('course/details', { course });
+    } catch (err) {
+        console.log(err.message);
+        res.redirect('/404');
+    }
+});
+
+router.get('/join/:id', isUser(), async (req, res) => {
+    try {
+        const course = await req.storage.getOneCourse(req.params.id);
+
+        const alreadyJoined = course.users.find(u => u._id == req.user._id);
+
+        if (alreadyJoined) {
+            throw new Error('You have already joined this course!');
+        }
+        await req.storage.joinCourse(req.user._id, req.params.id);
+        res.redirect(`/course/details/${req.params.id}`);
+    } catch (err) {
+        console.log(err.message);
+        res.redirect('/404');
+    }
+});
+
+router.get('/edit/:id', isUser(), async (req, res) => {
+    try {
+        const course = await req.storage.getOneCourse(req.params.id);
+
+        if (req.user._id != course.author) {
+            throw new Error('Only the author can edit this course!')
+        }
+
+        res.render('course/edit', { course });
+
+    } catch (err) {
+        console.log(err.message);
+        res.redirect('/404');
+    }
+});
+
+router.post('/edit/:id', isUser(),
+    body('title')
+        .notEmpty().withMessage('Title is required!').bail()
+        .isLength({ min: 4 }).withMessage('The title should be at least 4 characters!').bail(),
+    body('description')
+        .notEmpty().withMessage('Description is required!').bail()
+        .isLength({ min: 10 }).withMessage('The description should be at least 20 characters long!').bail(),
+    body('imageUrl')
+        .notEmpty().withMessage('Image URL is required!').bail()
+        .matches('^https?').withMessage('The URL must be valid one!').bail(),
+    body('duration')
+        .notEmpty().withMessage('Duration is required!').bail(),
+
+    async (req, res) => {
+        const { errors } = validationResult(req);
         try {
             const course = await req.storage.getOneCourse(req.params.id);
 
-            if (req.user) {
-                course.isAuthor = req.user._id == course.author;
-                course.hasJoined = course.users.find(u => u._id == req.user._id);
-                course.haveLogedUser = req.user._id;
+            if (req.user._id != course.author) {
+                throw new Error('Only the author can edit this course!');
             }
 
-            res.render('course/details', { course });
+            await req.storage.editCourse(req.params.id, req.body);
+            res.redirect(`/course/details/${req.params.id}`);
+
         } catch (err) {
             console.log(err.message);
-            res.redirect('/404');
+            const ctx = {
+                errors: err.message.split('\n'),
+                course : {
+                    _id: req.params.id,
+                    title: req.body.title,
+                    description: req.body.description,
+                    iamgeUrl: req.body.iamgeUrl,
+                    duration: req.body.duration
+                }
+            }
+            res.render('course/edit', ctx);
         }
     });
 
-    router.get('/join/:id', isUser(), async (req, res) => {
+    router.get('/delete/:id', isUser(), async (req, res) => {
         try {
             const course = await req.storage.getOneCourse(req.params.id);
 
-            const alreadyJoined = course.users.find(u => u._id == req.user._id);
-
-            if (alreadyJoined) {
-                throw new Error('You have already joined this course!');
+            if (req.user._id != course.author) {
+                throw new Error('Only the author can delete this course');
             }
-            await req.storage.joinCourse(req.user._id, req.params.id);
-            res.redirect(`/course/details/${req.params.id}`);
+            await req.storage.deleteCourse(req.params.id);
+            res.redirect('/');
         } catch (err) {
             console.log(err.message);
             res.redirect('/404');

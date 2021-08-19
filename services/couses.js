@@ -1,7 +1,18 @@
+const { options } = require('../controllers/courseController');
 const Course = require('../modews/Course');
 const User = require('../modews/User');
 
-async function getAllCourses() {
+async function getAllCourses(query) {
+    const options = {};
+
+    if (query.search) {
+        options.title = { $regex: query.search, $options: 'i' };
+        const courses = Course.find(options).lean();
+
+        return courses
+    }
+
+
     return Course.find().lean();
 }
 
@@ -39,9 +50,28 @@ async function joinCourse(userId, courseId) {
     return course;
 }
 
+async function editCourse(courseId, courseData) {
+    const course = await Course.findById(courseId);
+
+    course.title = courseData.title;
+    course.description = courseData.description;
+    course.imageUrl = courseData.imageUrl;
+    course.duration = courseData.duration;
+
+    await course.save();
+
+    return course;
+}
+
+async function deleteCourse(id) {
+    return Course.findByIdAndDelete(id);
+}
+
 module.exports = {
     getAllCourses,
     createCourse,
     getOneCourse,
-    joinCourse
+    joinCourse,
+    editCourse,
+    deleteCourse
 }
